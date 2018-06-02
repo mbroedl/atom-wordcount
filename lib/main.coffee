@@ -50,37 +50,28 @@ module.exports =
       type: 'string'
       default: '20%'
       order: 7
-    stripgrammars:
-      title: 'Grammars for ignoring'
-      description: 'Defines in which grammars specific parts of text are ignored'
-      type: 'array'
-      default: [
-        'source.gfm'
-        'text.md'
-        ]
+    strip:
+      title: 'Select Scopes for the Word Count'
       order: 8
-    ignorecode:
-      title: 'Ignore Markdown code blocks'
-      description: 'Do not count words inside of code blocks'
-      type: 'boolean'
-      default: false
-      order: 9
-    ignorecomments:
-      title: 'Ignore Markdown comments'
-      description: 'Do not count words inside of comments'
-      type: 'boolean'
-      default: false
-      items:
-        type: 'boolean'
-      order: 10
-    ignoreblockquotes:
-      title: 'Ignore Markdown block quotes'
-      description: 'Do not count words inside of block quotes'
-      type: 'boolean'
-      default: false
-      items:
-        type: 'boolean'
-      order: 11
+      type: 'object'
+      properties:
+        scopes:
+          title: 'Specific scopes to be used for counting'
+          description: 'These settings are meant to exclude specific scopes from counting (e.g. comments, blockquotes, code blocks, punctuation) or to only count specific scopes. This is done using the [atom/first-mate](https://github.com/atom/first-mate/blob/master/spec/scope-selector-spec.coffee) scope selector, so that complex selections can be achieved if necessary.\nThis field defines a the scopes to be matched in order for text to be counted or excluded.\n`comment` or `comment.*` would exclude all comments from the count, `quote.*, fenced.code.*` all fenced code blocks and all blockquotes. According to the scope selector syntax, the asterisks are not required.\nOther suggested codes to exclude in Markdown would be `punctuation.*` and `destination.link.*`.'
+          type: 'string'
+          default: ''
+          order: 1
+        exclude:
+          title: 'Negate Scope Selector'
+          description: 'Negate the scope selector above. This is the suggested option, as then scopes to be ignored can be comma-separated easily.\nIf deactivated, only the grammars in the list will be counted, which may lead to empty counts on unknown documents!'
+          type: 'boolean'
+          default: true
+          order: 2
+        inSelection:
+          title: 'Strip Scopes in Selections'
+          type: 'boolean'
+          default: true
+          order: 3
     showchars:
       title: 'Show character count'
       description: 'Shows the character count from the view'

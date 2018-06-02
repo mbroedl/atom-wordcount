@@ -1,3 +1,4 @@
+ScopeSelector = new require('first-mate').ScopeSelector
 
 module.exports =
 class WordcountView
@@ -36,7 +37,6 @@ class WordcountView
     scope = editor.getGrammar().scopeName
     wordCount = charCount = 0
     for text in texts
-      text = @stripText text, editor
       [words, chars] = @count text
       wordCount += words
       charCount += chars
@@ -64,51 +64,86 @@ class WordcountView
 
   getTexts: (editor) =>
     # NOTE: A cursor is considered an empty selection to the editor
-    texts = []
     selectionRanges = editor.getSelectedBufferRanges()
-    emptySelections = true
-    for range in selectionRanges
-      text = editor.getTextInBufferRange(range)
+    selectionRanges = selectionRanges.filter (range) =>
+        !((range.start.row == range.end.row) & (range.start.column == range.end.column))
 
-      # Text from buffer might be empty (no selection but a cursor)
-      if text
-        texts.push(text)
-        emptySelections = false
+    texts = @getFilteredTexts editor, selectionRanges
 
-    # No or only empty selections will cause the entire editor text to be returned instead
-    if emptySelections
-      texts.push(editor.getText())
-      @element.classList.remove @CSS_SELECTED_CLASS
+    if selectionRanges.length > 0
+        @element.classList.add @CSS_SELECTED_CLASS
     else
-      @element.classList.add @CSS_SELECTED_CLASS
+        @element.classList.remove @CSS_SELECTED_CLASS
 
     texts
 
-  stripText: (text, editor) ->
-    grammar = editor.getGrammar().scopeName
-    stripgrammars = atom.config.get('wordcount.stripgrammars')
+  getFilteredTexts: (editor, ranges) ->
+    # TODO: Remove this conditional once atom/ns-use-display-layers reaches stable and editor.tokenizedBuffer is available
+    # adopted from: https://github.com/atom/autocomplete-plus/blob/master/lib/symbol-store.js#L111
+    tokenizedBuffer = if editor.tokenizedBuffer then editor.tokenizedBuffer else editor.displayBuffer.tokenizedBuffer
 
-    if grammar in stripgrammars
+    stripSelection =  atom.config.get('wordcount.strip.inSelection')
+    stripGrammars = atom.config.get('wordcount.strip.scopes')
 
-      if atom.config.get('wordcount.ignorecode')
-        codePatterns = [/`{3}(.|\s)*?(`{3}|$)/g, /[ ]{4}.*?$/gm]
-        for pattern in codePatterns
-          text = text?.replace pattern, ''
+    if ( ranges.length > 0 & !stripSelection ) | !stripGrammars
+        if ranges.length > 0
+            return ranges.map (r) =>
+                editor.getTextInBufferRange r
+        else
+            return [ editor.getText() ]
 
-      if atom.config.get('wordcount.ignorecomments')
-        commentPatterns = [/(<!--(\n?(?:(?!-->).)*)+(-->|$))/g, /({>>(\n?(?:(?!<<}).)*)+(<<}|$))/g]
-        for pattern in commentPatterns
-          text = text?.replace pattern, ''
+    if ranges.length > 0
+        return ranges.map (r) =>
+            lines = tokenizedBuffer.tokenizedLinesForRows(r.start.row, r.end.row).map((l) => l.tokens)
+            lines[lines.length-1] = @sliceTokenizedLine lines[lines.length-1], 0, r.end.column
+            lines[0] = @sliceTokenizedLine lines[0], r.start.column, -1
+            @stripText lines
+    else
+        return [ @stripText tokenizedBuffer.tokenizedLines.map((l) => l.tokens) ]
 
-      if atom.config.get('wordcount.ignoreblockquotes')
-        blockquotePatterns = [/^\s{0,3}>(.*\S.*\n)+/gm]
-        for pattern in blockquotePatterns
-          text = text?.replace pattern, ''
+  stripText: (tokensByLine) ->
+    stripScopes = atom.config.get('wordcount.strip.scopes')
+    excludeGrammars = atom.config.get('wordcount.strip.exclude')
+    selector = new ScopeSelector stripScopes
 
-      # Reduce links to text
-      text = text?.replace /(?:__|[*#])|\[(.*?)\]\(.*?\)/gm, '$1'
-
+    text = tokensByLine.map(
+        (line) => line.filter(
+            (token) => selector.matches(token.scopes) == !excludeGrammars
+        ).map(
+            (token) => token.value
+        ).join('')
+    ).filter(
+        (line) => line.length > 0
+    ).join('\n')
     text
+
+  sliceTokenizedLine: (tokensInLine, start, end) ->
+    if end == 0
+      return []
+    ct = 0
+    cutstart = -1
+    cutend = -1
+    tokensInLine = tokensInLine.filter (t) =>
+      if t.value.length + ct > start & cutstart < 0
+        cutstart = start - ct
+      ct += t.value.length
+      if cutstart >= 0 & cutend < 0
+        if ct > end & cutend < 0 & end >= 0
+          cutend = end - ct + t.value.length
+        return true
+      else
+        return false
+    if cutstart > 0
+      tokensInLine[0] = {
+          scopes : tokensInLine[0].scopes
+          value : tokensInLine[0].value.slice(cutstart)
+          }
+    if cutend > 0
+      tokensInLine[tokensInLine.length-1] = {
+          scopes : tokensInLine[tokensInLine.length-1].scopes
+          value : tokensInLine[tokensInLine.length-1].value.slice(0, cutend)
+          }
+    tokensInLine
 
   count: (text) ->
     words = text?.match(@wordregex)?.length
