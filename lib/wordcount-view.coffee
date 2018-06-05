@@ -78,10 +78,6 @@ class WordcountView
     texts
 
   getFilteredTexts: (editor, ranges) ->
-    # TODO: Remove this conditional once atom/ns-use-display-layers reaches stable and editor.tokenizedBuffer is available
-    # adopted from: https://github.com/atom/autocomplete-plus/blob/master/lib/symbol-store.js#L111
-    tokenizedBuffer = if editor.tokenizedBuffer then editor.tokenizedBuffer else editor.displayBuffer.tokenizedBuffer
-
     stripSelection =  atom.config.get('wordcount.strip.inSelection')
     stripGrammars = atom.config.get('wordcount.strip.scopes')
 
@@ -94,12 +90,12 @@ class WordcountView
 
     if ranges.length > 0
         return ranges.map (r) =>
-            lines = tokenizedBuffer.tokenizedLinesForRows(r.start.row, r.end.row).map((l) => l.tokens)
+            lines = editor.tokenizedBuffer.tokenizedLinesForRows(r.start.row, r.end.row).map((l) => l.tokens)
             lines[lines.length-1] = @sliceTokenizedLine lines[lines.length-1], 0, r.end.column
             lines[0] = @sliceTokenizedLine lines[0], r.start.column, -1
             @stripText lines
     else
-        return [ @stripText tokenizedBuffer.tokenizedLines.map((l) => l.tokens) ]
+        return [ @stripText editor.tokenizedBuffer.tokenizedLines.map((l) => l.tokens) ]
 
   stripText: (tokensByLine) ->
     stripScopes = atom.config.get('wordcount.strip.scopes')
