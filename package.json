@@ -21,8 +21,7 @@
   },
   "dependencies": {
     "first-mate": "^7.1.1",
-    "lodash": "^3.10.1",
-    "word-regex": "^0.1.2"
+    "lodash": "^3.10.1"
   },
   "consumedServices": {
     "status-bar": {
