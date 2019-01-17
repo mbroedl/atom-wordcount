@@ -65,7 +65,7 @@ class WordcountView
 
   getTexts: (editor) =>
     # NOTE: A cursor is considered an empty selection to the editor
-    selectionRanges = editor.getSelectedBufferRanges()
+    selectionRanges = editor.getSelectedScreenRanges()
     selectionRanges = selectionRanges.filter (range) =>
         !((range.start.row == range.end.row) & (range.start.column == range.end.column))
 
@@ -82,7 +82,10 @@ class WordcountView
     stripSelection =  atom.config.get('wordcount.strip.inSelection')
     stripGrammars = atom.config.get('wordcount.strip.scopes')
 
-    if ( ranges.length > 0 & !stripSelection ) | !stripGrammars
+    tokenizedLines = @getTokenizedLines editor
+    @failedTokenisation = !tokenizedLines
+
+    if ( ranges.length > 0 & !stripSelection ) | !stripGrammars | @failedTokenization
         if ranges.length > 0
             return ranges.map (r) =>
                 editor.getTextInBufferRange r
@@ -91,12 +94,27 @@ class WordcountView
 
     if ranges.length > 0
         return ranges.map (r) =>
-            lines = editor.tokenizedBuffer.tokenizedLinesForRows(r.start.row, r.end.row).map((l) => l.tokens)
+            lines = tokenizedLines.slice(r.start.row, r.end.row+1)
             lines[lines.length-1] = @sliceTokenizedLine lines[lines.length-1], 0, r.end.column
             lines[0] = @sliceTokenizedLine lines[0], r.start.column, -1
-            @stripText lines
+            @stripText @stripScreenWrap lines, editor, r.start.row
     else
-        return [ @stripText editor.tokenizedBuffer.tokenizedLines.map((l) => l.tokens) ]
+        return [ @stripText @stripScreenWrap tokenizedLines, editor, 0 ]
+
+  getTokenizedLines: (editor) ->
+    if editor.tokensForScreenRow
+      return [0...editor.getScreenLineCount()].map((i) =>
+          editor.tokensForScreenRow(i))
+    else
+      return false
+
+  stripScreenWrap: (tokensByScreenLine, editor, startRow = 0) ->
+    tokensByScreenLine.map((line, rowNum) => line.filter(
+      (token, itemNum) =>
+        itemNum != 0 or
+        not (token.text.match(/^\s+$/) and
+        editor.bufferPositionForScreenPosition([rowNum + startRow, 0]).column == 0)
+    ))
 
   stripText: (tokensByLine) ->
     stripScopes = atom.config.get('wordcount.strip.scopes')
@@ -105,10 +123,12 @@ class WordcountView
 
     text = tokensByLine.map(
         (line) => line.filter(
-            (token) => selector.matches(token.scopes) == !excludeGrammars
-        ).map(
-            (token) => token.value
-        ).join('')
+            (token) => selector.matches(
+                token.scopes.map((scope) => scope.replace(/syntax--/g, '').replace(/ /g, '.'))
+            ) == !excludeGrammars
+          ).map(
+            (token) => token.text
+          ).join('')
     ).filter(
         (line) => line.length > 0
     ).join('\n')
@@ -121,24 +141,24 @@ class WordcountView
     cutstart = -1
     cutend = -1
     tokensInLine = tokensInLine.filter (t) =>
-      if t.value.length + ct > start & cutstart < 0
+      if t.text.length + ct > start & cutstart < 0
         cutstart = start - ct
-      ct += t.value.length
+      ct += t.text.length
       if cutstart >= 0 & cutend < 0
         if ct > end & cutend < 0 & end >= 0
-          cutend = end - ct + t.value.length
+          cutend = end - ct + t.text.length
         return true
       else
         return false
     if cutstart > 0
       tokensInLine[0] = {
           scopes : tokensInLine[0].scopes
-          value : tokensInLine[0].value.slice(cutstart)
+          text : tokensInLine[0].text.slice(cutstart)
           }
     if cutend > 0
       tokensInLine[tokensInLine.length-1] = {
           scopes : tokensInLine[tokensInLine.length-1].scopes
-          value : tokensInLine[tokensInLine.length-1].value.slice(0, cutend)
+          text : tokensInLine[tokensInLine.length-1].text.slice(0, cutend)
           }
     tokensInLine
 
