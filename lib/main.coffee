@@ -59,7 +59,7 @@ module.exports =
           title: 'Specific scopes to be used for counting'
           description: 'These settings are meant to exclude specific scopes from counting (e.g. comments, blockquotes, code blocks, punctuation) or to only count specific scopes. This is done using the [atom/first-mate](https://github.com/atom/first-mate/blob/master/spec/scope-selector-spec.coffee) scope selector, so that complex selections can be achieved if necessary.\nThis field defines a the scopes to be matched in order for text to be counted or excluded.\n`comment` or `comment.*` would exclude all comments from the count, `quote.*, fenced.code.*` all fenced code blocks and all blockquotes. According to the scope selector syntax, the asterisks are not required.\nOther suggested codes to exclude in Markdown would be `punctuation.*` and `destination.link.*`.'
           type: 'string'
-          default: ''
+          default: 'comment, punctuation'
           order: 1
         exclude:
           title: 'Negate Scope Selector'
