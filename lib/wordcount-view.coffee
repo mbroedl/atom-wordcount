@@ -42,7 +42,6 @@ class WordcountView
       [words, chars] = @count text
       wordCount += words
       charCount += chars
-    @failedTokenisation = true
     str = ''
     str += ("<a href='https://github.com/OleMchls/atom-wordcount/issues/'><i id='wordcount-failedTokenisation' class='wordcount-icon icon-alert' title='Filtering of tokens did not succeed, so that word and character counts are likely too high. If you have some time, please click this icon to get to the issue tracker of this package and see if this has already been reported.'></i></a>") if @failedTokenisation
     str += "<span class='wordcount-words'>#{wordCount || 0} W</span>" if atom.config.get 'wordcount.showwords'
